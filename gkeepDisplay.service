@@ -1,0 +1,17 @@
+Description=Gkeep Display Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3.7 /home/pi/gkeepDisplay/gkeepDisplay.py
+WorkingDirectory=/home/pi/gkeepDisplay
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=root
+
+[Unit]
+StartLimitIntervalSec=20
+StartLimitBurst=20
+
+[Install]
+WantedBy=multi-user.target
