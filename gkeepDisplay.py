@@ -8,6 +8,48 @@ import RPi.GPIO as GPIO
 import signal
 import sys
 
+from dotStarMatrix import DotStarMatrix
+
+from time import sleep
+import board
+from PIL import ImageFont
+
+font = ImageFont.truetype('../fontTest/pixelFJ8pt1__.TTF', 8)
+matrix = DotStarMatrix(32, 8, board.D6, board.D5, 1)
+
+class TaskLine:
+    def __init__(self, text, checked, selected, indented):
+        self.text = text
+        self.checked = checked
+        self.selected = selected
+        self.indented = indented
+        
+        if self.checked:        
+            self.picturePath = "ticked.png"
+        else:
+            self.picturePath = "unticked.png"
+        
+    def toString(self):
+        if self.text == None:
+            return ""
+            
+        notePrint = ""
+        if self.selected:
+            notePrint += "> "
+        
+        if self.indented:
+            notePrint += "\t"
+        if self.checked :
+            notePrint += 'x '
+        else:
+            notePrint += 'o '
+            
+        if "http" in self.text:
+            notePrint += "_website url_"        
+        else:        
+            notePrint += self.text
+        return notePrint
+
 class State(Enum):     
     MAINITEMS = 0    
     SUBITEMS = 1   
@@ -25,6 +67,8 @@ DOWN_LED = 25
 
 UP_BUTTON = 8
 UP_LED = 7
+
+LINE_DISPLAY = 3
 
 
 indexItem = 0
@@ -45,81 +89,91 @@ def clear():
         _ = system('clear') 
         
 def callback_select(channel):
-    global state
-    global indexItem
-    global subIndexItem
-    global keep
-    GPIO.output(SELECT_LED, GPIO.HIGH)
     sleep(0.1)
-    GPIO.output(SELECT_LED, GPIO.LOW)
-    if state == State.MAINITEMS:
-        item = gnote.items[indexItem]
-        item.checked = not item.checked
-        keep.sync()
-        clear()
-        printItems(getUnIndented(gnote.items))
-    elif state == State.SUBITEMS:  
-        item = gnote.items[indexItem+subIndexItem]
-        item.checked = not item.checked
-        keep.sync()
-        clear()      
-        printItems(getSubitems(getUnIndented(gnote.items),indexItem))
+    if(GPIO.input(channel)):
+        global state
+        global indexItem
+        global subIndexItem
+        global keep
+        GPIO.output(SELECT_LED, GPIO.HIGH)
+        sleep(0.1)
+        GPIO.output(SELECT_LED, GPIO.LOW)
+        if state == State.MAINITEMS:
+            item = getUnIndented(gnote.items)[indexItem]
+            item.checked = not item.checked
+            for subitem in item.subitems:
+                subitem.checked = item.checked 
+            keep.sync()
+            clear()
+            printItems(getUnIndented(gnote.items))
+        elif state == State.SUBITEMS:  
+            item = gnote.items[indexItem+subIndexItem]
+            item.checked = not item.checked
+            keep.sync()
+            clear()      
+            printItems(getSubitems(getUnIndented(gnote.items),indexItem))
     
 
 def callback_develop(channel):
-    global state
-    global indexItem
-    global subIndexItem
-    clear()
-    if state == State.MAINITEMS:
-        state = State.SUBITEMS
-        GPIO.output(DEVELOP_LED, GPIO.HIGH)     
-        subIndexItem = 0        
-        printItems(getSubitems(getUnIndented(gnote.items),indexItem))
-    elif state == State.SUBITEMS:
-        state = State.MAINITEMS
-        GPIO.output(DEVELOP_LED, GPIO.LOW)   
-        printItems(getUnIndented(gnote.items))
+    sleep(0.1)
+    if(GPIO.input(channel)):
+        global state
+        global indexItem
+        global subIndexItem
+        clear()
+        if state == State.MAINITEMS:
+            state = State.SUBITEMS
+            GPIO.output(DEVELOP_LED, GPIO.HIGH)     
+            subIndexItem = 0        
+            printItems(getSubitems(getUnIndented(gnote.items),indexItem))
+        elif state == State.SUBITEMS:
+            state = State.MAINITEMS
+            GPIO.output(DEVELOP_LED, GPIO.LOW)   
+            printItems(getUnIndented(gnote.items))
 
 def callback_up(channel):
-    global indexItem
-    global subIndexItem
-    global gnote
-    global state
-    GPIO.output(UP_LED, GPIO.HIGH)
     sleep(0.1)
-    GPIO.output(UP_LED, GPIO.LOW)    
-    
-    if state == State.MAINITEMS:
-        if indexItem < len(getUnIndented(gnote.items)) - 1:
-            indexItem += 1
-        clear()
-        printItems(getUnIndented(gnote.items))
-    elif state == State.SUBITEMS:  
-        if subIndexItem < len(getSubitems(getUnIndented(gnote.items),indexItem)) - 1:
-            subIndexItem += 1
-        clear()      
-        printItems(getSubitems(getUnIndented(gnote.items),indexItem))
+    if(GPIO.input(channel)):
+        global indexItem
+        global subIndexItem
+        global gnote
+        global state
+        GPIO.output(UP_LED, GPIO.HIGH)
+        sleep(0.1)
+        GPIO.output(UP_LED, GPIO.LOW)    
+        
+        if state == State.MAINITEMS:
+            if indexItem < len(getUnIndented(gnote.items)) - 1:
+                indexItem += 1
+            clear()
+            printItems(getUnIndented(gnote.items))
+        elif state == State.SUBITEMS:  
+            if subIndexItem < len(getSubitems(getUnIndented(gnote.items),indexItem)) - 1:
+                subIndexItem += 1
+            clear()      
+            printItems(getSubitems(getUnIndented(gnote.items),indexItem))
 
 def callback_down(channel):
-    global indexItem
-    global subIndexItem
-    global gnote
-    global state
-    GPIO.output(DOWN_LED, GPIO.HIGH)
     sleep(0.1)
-    GPIO.output(DOWN_LED, GPIO.LOW)
-    
-    if state == State.MAINITEMS:
-        if indexItem != 0:
-            indexItem -= 1
-        clear()
-        printItems(getUnIndented(gnote.items))     
-    elif state == State.SUBITEMS:  
-        if subIndexItem != 0:
-            subIndexItem -= 1
-        clear()      
-        printItems(getSubitems(getUnIndented(gnote.items),indexItem))
+    if(GPIO.input(channel)):
+        global indexItem
+        global subIndexItem
+        global gnote
+        global state
+        GPIO.output(DOWN_LED, GPIO.HIGH)
+        sleep(0.1)
+        GPIO.output(DOWN_LED, GPIO.LOW)
+        
+        if state == State.MAINITEMS:
+            if indexItem != 0:
+                indexItem -= 1
+            clear()
+            printItems(getUnIndented(gnote.items))     
+        elif state == State.SUBITEMS:  
+            if subIndexItem != 0:
+                subIndexItem -= 1
+            clear()      
+            printItems(getSubitems(getUnIndented(gnote.items),indexItem))
     
  
 
@@ -128,31 +182,43 @@ def printItems(items):
     global state    
     global indexItem    
     global subIndexItem
+    global LINE_DISPLAY
+    
+    global matrix
+    global font
+        
     i = 0
+    lines = []
+    
+    if state == State.MAINITEMS:
+        index = indexItem                
+    else:  
+        index = subIndexItem
+    
     for item in items:
-        notePrint = ""
-        if state == State.MAINITEMS:
-            if i == indexItem:
-                notePrint += "> "
-        elif state == State.SUBITEMS:  
-            if i == subIndexItem:
-                notePrint += "> "
-        
-        if item.indented:
-            notePrint += "\t"
-        if item.checked:
-            notePrint += 'x '
-        else:
-            notePrint += 'o '
-            
-        if "http" in item.text:
-            notePrint += "_website url_"
-        
-        else:        
-            notePrint += item.text
-        
-        print(notePrint)
+        selected = False
+        if i == index:
+            selected = True
+        lines.append(TaskLine(item.text, item.checked, selected, item.indented))
         i += 1
+        
+    while(len(lines)<LINE_DISPLAY):
+        lines.append(TaskLine(None, False, False, False))
+    
+    if index+LINE_DISPLAY > len(lines):
+        to_draw = lines[len(lines)-LINE_DISPLAY:len(lines)]
+    else:
+        to_draw = lines[index:index+LINE_DISPLAY]
+        
+    for line in to_draw:
+        print(line.toString())
+        
+    if to_draw[0].selected:
+        color = (12, 85, 12)
+    else:
+        color = (3, 21, 3)
+        
+    matrix.scrollTextWithPicture(to_draw[0].text, font, color , 0.05, to_draw[0].picturePath, False)
         
 def getSubitems(items, index):
     return [items[index]] + items[index].subitems
@@ -188,10 +254,10 @@ if __name__ == '__main__':
     GPIO.output(UP_LED, GPIO.LOW)
     GPIO.output(DOWN_LED, GPIO.LOW)
 
-    GPIO.add_event_detect(SELECT_BUTTON, GPIO.RISING, callback=callback_select, bouncetime=1000)
-    GPIO.add_event_detect(DEVELOP_BUTTON, GPIO.RISING, callback=callback_develop, bouncetime=1000)
-    GPIO.add_event_detect(UP_BUTTON, GPIO.RISING, callback=callback_up, bouncetime=500)
-    GPIO.add_event_detect(DOWN_BUTTON, GPIO.RISING, callback=callback_down, bouncetime=500)
+    GPIO.add_event_detect(SELECT_BUTTON, GPIO.RISING, callback=callback_select, bouncetime=300)
+    GPIO.add_event_detect(DEVELOP_BUTTON, GPIO.RISING, callback=callback_develop, bouncetime=300)
+    GPIO.add_event_detect(UP_BUTTON, GPIO.RISING, callback=callback_up, bouncetime=300)
+    GPIO.add_event_detect(DOWN_BUTTON, GPIO.RISING, callback=callback_down, bouncetime=300)
     
     signal.signal(signal.SIGINT, signal_handler)
     clear()

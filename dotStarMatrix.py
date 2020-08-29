@@ -34,10 +34,13 @@ class DotStarMatrix:
         pix = image.load()
         for x in range(0,self.width):
             for y in range(0,self.height):
-                if(x%2==1):  
-                    self.dots[x*self.height+((self.height-1)-y)] = pix[x,y]    
-                else:
-                    self.dots[x*self.height+y] = pix[x,y]
+                try:
+                    if(x%2==1):  
+                        self.dots[x*self.height+((self.height-1)-y)] = pix[x,y]    
+                    else:
+                        self.dots[x*self.height+y] = pix[x,y]
+                except:
+                    self.dots[x*self.height+y] = (0,0,0)
         self.dots.show()    
         
     def writeOpenCVFrame(self, frame):
@@ -73,17 +76,54 @@ class DotStarMatrix:
         mask.save_ppm("temp.ppm")
         mask = Image.open("temp.ppm")
 
-        for i in range(self.width, sizeTxt[0]*-1-2, -1):
+        for i in range(0, sizeTxt[0]*-1-2, -1):
             picture = Image.new("RGB", (self.width, self.height))
             pictureMask = Image.new("L", (self.width, self.height))
             picture1 = Image.new("RGB", (self.width, self.height),color)
             pictureMask.paste(mask,(i,0))
             picture.paste(picture1,(0,0),pictureMask)
+            print("one")
 
             self.writePilImage(picture)
             
 
             sleep(scrollDelay)
+        
+    def scrollTextWithPicture(self, text, font, color, scrollDelay, path, scroll):
+        im = Image.open(path)
+        pix = im.load()
+                    
+        sizeTxt = font.getsize(text)
+        mask = font.getmask(text, "1")
+        mask.save_ppm("temp.ppm")
+        mask = Image.open("temp.ppm")
+        print("size: ",sizeTxt[0])
+        
+        if sizeTxt[0] > 32-6 and scroll == True:
+
+            for i in range(0, sizeTxt[0]*-1-2, -1):
+                picture = Image.new("RGB", (self.width, self.height))
+                pictureMask = Image.new("L", (self.width, self.height))
+                picture1 = Image.new("RGB", (self.width, self.height),color)
+                pictureMask.paste(mask,(i,0))
+                picture.paste(picture1,(6,0),pictureMask)
+                picture.paste(im,(0,0))
+                print("one")
+                self.writePilImage(picture)
+                sleep(scrollDelay)
+        else:
+            picture = Image.new("RGB", (self.width, self.height))
+            pictureMask = Image.new("L", (self.width, self.height))
+            picture1 = Image.new("RGB", (self.width, self.height),color)
+            pictureMask.paste(mask,(0,0))
+            picture.paste(picture1,(6,0),pictureMask)
+            picture.paste(im,(0,0))
+            self.writePilImage(picture)
+            
+
+            self.writePilImage(picture)
+            
+
     
     
 
