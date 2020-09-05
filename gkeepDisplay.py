@@ -1,7 +1,7 @@
 from os import system, name 
 import credential
 import gkeepapi
-from time import sleep
+from time import sleep, time
 from enum import Enum
 
 import RPi.GPIO as GPIO
@@ -10,9 +10,16 @@ import sys
 
 from dotStarMatrix import DotStarMatrix
 
-from time import sleep
 import board
 from PIL import ImageFont
+
+class RunningState(Enum):
+	RUNNING = 1
+	PAUSE	 = 2
+	
+runningState = RunningState.RUNNING
+
+lastAction = time()
 
 font = ImageFont.truetype('../fontTest/pixelFJ8pt1__.TTF', 8)
 matrix = DotStarMatrix(32, 8, board.D6, board.D5, 1)
@@ -77,8 +84,11 @@ subIndexItem = 0
 keep = gkeepapi.Keep()
 keep.login(credential.mail, credential.password)
 gnote = keep.get(credential.noteUUID)
+toPrint = []
 
 def signal_handler(sig, frame):
+    global matrix
+    matrix.clear()
     GPIO.cleanup()
     sys.exit(0)
 
@@ -95,23 +105,27 @@ def callback_select(channel):
         global indexItem
         global subIndexItem
         global keep
+        global toPrint
+        global lastAction
+        lastAction = time()
         GPIO.output(SELECT_LED, GPIO.HIGH)
         sleep(0.1)
         GPIO.output(SELECT_LED, GPIO.LOW)
         if state == State.MAINITEMS:
-            item = getUnIndented(gnote.items)[indexItem]
+            item = toPrint[indexItem]
             item.checked = not item.checked
             for subitem in item.subitems:
                 subitem.checked = item.checked 
             keep.sync()
-            clear()
-            printItems(getUnIndented(gnote.items))
-        elif state == State.SUBITEMS:  
-            item = gnote.items[indexItem+subIndexItem]
+            toPrint = getUnIndented(gnote.items)
+            #printItems(getUnIndented(gnote.items))
+        elif state == State.SUBITEMS: 
+
+            item = toPrint[subIndexItem]
             item.checked = not item.checked
             keep.sync()
-            clear()      
-            printItems(getSubitems(getUnIndented(gnote.items),indexItem))
+            toPrint = getSubitems(getUnIndented(gnote.items),indexItem)
+            #printItems(getSubitems(getUnIndented(gnote.items),indexItem))
     
 
 def callback_develop(channel):
@@ -120,16 +134,22 @@ def callback_develop(channel):
         global state
         global indexItem
         global subIndexItem
-        clear()
+        global toPrint
+        global matrix
+        matrix.resetScroll()
+        global lastAction
+        lastAction = time()
         if state == State.MAINITEMS:
             state = State.SUBITEMS
             GPIO.output(DEVELOP_LED, GPIO.HIGH)     
             subIndexItem = 0        
-            printItems(getSubitems(getUnIndented(gnote.items),indexItem))
+            toPrint = getSubitems(getUnIndented(gnote.items),indexItem)
+            #printItems(getSubitems(getUnIndented(gnote.items),indexItem))
         elif state == State.SUBITEMS:
             state = State.MAINITEMS
             GPIO.output(DEVELOP_LED, GPIO.LOW)   
-            printItems(getUnIndented(gnote.items))
+            toPrint = getUnIndented(gnote.items)
+            #printItems(getUnIndented(gnote.items))
 
 def callback_up(channel):
     sleep(0.1)
@@ -138,6 +158,11 @@ def callback_up(channel):
         global subIndexItem
         global gnote
         global state
+        global toPrint
+        global matrix
+        global lastAction
+        lastAction = time()
+        matrix.resetScroll()
         GPIO.output(UP_LED, GPIO.HIGH)
         sleep(0.1)
         GPIO.output(UP_LED, GPIO.LOW)    
@@ -145,13 +170,13 @@ def callback_up(channel):
         if state == State.MAINITEMS:
             if indexItem < len(getUnIndented(gnote.items)) - 1:
                 indexItem += 1
-            clear()
-            printItems(getUnIndented(gnote.items))
+            toPrint = getUnIndented(gnote.items)
+            #printItems(getUnIndented(gnote.items))
         elif state == State.SUBITEMS:  
             if subIndexItem < len(getSubitems(getUnIndented(gnote.items),indexItem)) - 1:
                 subIndexItem += 1
-            clear()      
-            printItems(getSubitems(getUnIndented(gnote.items),indexItem))
+            toPrint = getSubitems(getUnIndented(gnote.items),indexItem)
+            #printItems(getSubitems(getUnIndented(gnote.items),indexItem))
 
 def callback_down(channel):
     sleep(0.1)
@@ -160,6 +185,11 @@ def callback_down(channel):
         global subIndexItem
         global gnote
         global state
+        global toPrint
+        global matrix
+        global lastAction
+        lastAction = time()
+        matrix.resetScroll()
         GPIO.output(DOWN_LED, GPIO.HIGH)
         sleep(0.1)
         GPIO.output(DOWN_LED, GPIO.LOW)
@@ -167,13 +197,13 @@ def callback_down(channel):
         if state == State.MAINITEMS:
             if indexItem != 0:
                 indexItem -= 1
-            clear()
-            printItems(getUnIndented(gnote.items))     
+            toPrint = getUnIndented(gnote.items)
+            #printItems(getUnIndented(gnote.items))     
         elif state == State.SUBITEMS:  
             if subIndexItem != 0:
                 subIndexItem -= 1
-            clear()      
-            printItems(getSubitems(getUnIndented(gnote.items),indexItem))
+            toPrint = getSubitems(getUnIndented(gnote.items),indexItem)
+            #printItems(getSubitems(getUnIndented(gnote.items),indexItem))
     
  
 
@@ -210,8 +240,8 @@ def printItems(items):
     else:
         to_draw = lines[index:index+LINE_DISPLAY]
         
-    for line in to_draw:
-        print(line.toString())
+    #for line in to_draw:
+    #    print(line.toString())
 
     index = 0
 
@@ -222,7 +252,7 @@ def printItems(items):
         else:
             color = (3, 21, 3)
 
-        matrix.scrollTextWithPicture(line.text, font, color , 0.05, line.picturePath, False, index)
+        matrix.scrollTextWithPicture(line.text, font, color , 0.05, line.picturePath, line.selected, index)
         index += 1
         
 def getSubitems(items, index):
@@ -266,7 +296,19 @@ if __name__ == '__main__':
     
     signal.signal(signal.SIGINT, signal_handler)
     clear()
-    printItems(getUnIndented(gnote.items))
+
+    toPrint = getUnIndented(gnote.items)
+
+    while True:
+        if time() - lastAction > 30 and runningState == RunningState.RUNNING:
+            runningState = RunningState.PAUSE
+            matrix.clear()
+        elif time() - lastAction < 30 and runningState == RunningState.PAUSE:
+            runningState = RunningState.RUNNING
+        elif runningState == RunningState.RUNNING:
+            printItems(toPrint)
+        
+        sleep(0.01)
      
     signal.pause()
 
