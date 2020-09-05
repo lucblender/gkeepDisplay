@@ -68,7 +68,7 @@ DOWN_LED = 25
 UP_BUTTON = 8
 UP_LED = 7
 
-LINE_DISPLAY = 3
+LINE_DISPLAY = 2
 
 
 indexItem = 0
@@ -212,13 +212,18 @@ def printItems(items):
         
     for line in to_draw:
         print(line.toString())
+
+    index = 0
+
+    for line in to_draw:
         
-    if to_draw[0].selected:
-        color = (12, 85, 12)
-    else:
-        color = (3, 21, 3)
-        
-    matrix.scrollTextWithPicture(to_draw[0].text, font, color , 0.05, to_draw[0].picturePath, False)
+        if line.selected:
+            color = (12, 85, 12)
+        else:
+            color = (3, 21, 3)
+
+        matrix.scrollTextWithPicture(line.text, font, color , 0.05, line.picturePath, False, index)
+        index += 1
         
 def getSubitems(items, index):
     return [items[index]] + items[index].subitems

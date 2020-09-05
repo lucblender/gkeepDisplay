@@ -1,5 +1,6 @@
 import board
-import adafruit_dotstar as dotstar
+#import adafruit_dotstar as dotstar
+import neopixel
 from PIL import Image,ImageDraw,ImageFont
 import cv2
 
@@ -19,8 +20,6 @@ def writeFrame(dots, image):
                 dots[x*height+y] = image[y][x] 
     dots.show()       
 
-dots = dotstar.DotStar(board.SCK, board.MOSI, width*height, brightness=0.7, auto_write=False)
-
     
 
 class DotStarMatrix:
@@ -28,7 +27,15 @@ class DotStarMatrix:
     def __init__(self, width, height, syncPin, dataPin, brightness):
         self.width = width
         self.height = height
-        self.dots = dotstar.DotStar(syncPin, dataPin, width*height, brightness=brightness, auto_write=False)
+        ORDER = neopixel.GRB
+        self.pannelNumber = 2
+        self.line = 2
+        
+
+        self.dots = neopixel.NeoPixel(
+            board.D21, width*height*self.pannelNumber*self.line, brightness=brightness, auto_write=False, pixel_order=ORDER
+        ) 
+        #dotstar.DotStar(syncPin, dataPin, width*height, brightness=brightness, auto_write=False)
     
     def writePilImage(self, image):
         pix = image.load()
@@ -41,7 +48,30 @@ class DotStarMatrix:
                         self.dots[x*self.height+y] = pix[x,y]
                 except:
                     self.dots[x*self.height+y] = (0,0,0)
-        self.dots.show()    
+        self.dots.show() 
+
+    def writePilImage(self, image, pannel, line):
+        pix = image.load()
+        for x in range(0,self.width):
+            for y in range(0,self.height):
+                try:
+                    if(x%2==1):  
+                        self.dots[(
+                            (line*self.pannelNumber*self.height*self.width)+
+                            (pannel*self.height*self.width)+
+                            x*self.height
+                            +((self.height-1)-y))] = pix[x,y]    
+                    else:
+                        self.dots[(
+                            (line*self.pannelNumber*self.height*self.width)+
+                            (pannel*self.height*self.width)+
+                            x*self.height+y)] = pix[x,y]
+                except:
+                    self.dots[(
+                        (line*self.pannelNumber*self.height*self.width)+
+                        (pannel*self.height*self.width)
+                        +x*self.height+y)] = (0,0,0)
+        self.dots.show() 
         
     def writeOpenCVFrame(self, frame):
         for x in range(0,self.width):
@@ -89,7 +119,7 @@ class DotStarMatrix:
 
             sleep(scrollDelay)
         
-    def scrollTextWithPicture(self, text, font, color, scrollDelay, path, scroll):
+    def scrollTextWithPicture(self, text, font, color, scrollDelay, path, scroll, line):
         im = Image.open(path)
         pix = im.load()
                     
@@ -112,16 +142,23 @@ class DotStarMatrix:
                 self.writePilImage(picture)
                 sleep(scrollDelay)
         else:
-            picture = Image.new("RGB", (self.width, self.height))
-            pictureMask = Image.new("L", (self.width, self.height))
-            picture1 = Image.new("RGB", (self.width, self.height),color)
-            pictureMask.paste(mask,(0,0))
-            picture.paste(picture1,(6,0),pictureMask)
-            picture.paste(im,(0,0))
-            self.writePilImage(picture)
-            
+            for i in range(0,self.pannelNumber):
+                picture = Image.new("RGB", (self.width, self.height))
+                pictureMask = Image.new("L", (self.width, self.height))
+                picture1 = Image.new("RGB", (self.width, self.height),color)
+                
+                if(i == 0):
+                    pictureMask.paste(mask,(6,0))
+                else:
+                    pictureMask.paste(mask,(-32+6,0))             
+                
+                picture.paste(picture1,(0,0),pictureMask)
 
-            self.writePilImage(picture)
+                if(i == 0):
+                    picture.paste(im,(0,0))
+                
+                self.writePilImage(picture, i, line)
+                
             
 
     
