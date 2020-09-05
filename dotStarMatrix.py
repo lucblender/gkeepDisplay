@@ -134,9 +134,14 @@ class DotStarMatrix:
             text = " "
                     
         sizeTxt = font.getsize(text)
-        mask = font.getmask(text, "1")
-        mask.save_ppm("temp.ppm")
-        mask = Image.open("temp.ppm")
+        maskImagingCore = font.getmask(text, "1")
+
+        mask = Image.new("L", maskImagingCore.size)
+
+        for x in range(0, maskImagingCore.size[0]):
+            for y in range(0, maskImagingCore.size[1]):
+                coord = (x,y)
+                mask.putpixel(coord,maskImagingCore.getpixel(coord))
         
         if sizeTxt[0] > 64-6 and scroll == True:
 
